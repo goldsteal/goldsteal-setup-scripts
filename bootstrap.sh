@@ -53,9 +53,9 @@ echo "[+] Bedrock detected."
 # -----------------------
 # Step 2: Configure strata
 # -----------------------
-if ask "Do you want to configure recommended strata (Arch, Ubuntu, Fedora)?"; then
+if ask "Do you want to configure recommended strata (Arch, Debian, Fedora)?"; then
     sudo brl fetch arch
-    sudo brl fetch ubuntu
+    sudo brl fetch debian
     sudo brl fetch fedora
 fi
 
@@ -81,7 +81,37 @@ else
     done
 fi
 
-install_if_missing yay
+# -----------------------
+# Step 3b: Install yay (optional, Arch-only)
+# -----------------------
+install_yay() {
+    # Check if Arch stratum exists
+    if brl which -s pacman >/dev/null 2>&1; then
+        echo "[*] Arch stratum detected."
+
+        # Prompt for yay installation
+        if ask "Do you want to install yay (AUR helper) in Arch stratum?"; then
+            echo "[*] Installing base-devel and git in Arch stratum..."
+            brl sh -c 'sudo pacman -Sy --noconfirm --needed base-devel git'
+
+            echo "[*] Cloning and building yay..."
+            brl sh -c '
+                cd /tmp &&
+                rm -rf yay &&
+                git clone https://aur.archlinux.org/yay.git &&
+                cd yay &&
+                makepkg -si --noconfirm
+            '
+            echo "[+] yay installed in Arch stratum."
+        else
+            echo "[!] Skipped yay installation."
+        fi
+    else
+        echo "[!] Arch stratum not detected; skipping yay."
+    fi
+}
+
+install_yay
 
 # -----------------------
 # Step 4: Apply configs (colors + term launcher)
