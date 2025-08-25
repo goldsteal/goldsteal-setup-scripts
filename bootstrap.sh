@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# bootstrap.sh — Modular Bedrock Linux bootstrap with strata, tools, terminal, colors, and SSH
 set -euo pipefail
 
 ask() {
@@ -31,7 +32,9 @@ safe_run_config() {
     fi
 }
 
-# --- Step 1: Bedrock check ---
+# -----------------------
+# Step 1: Bedrock check
+# -----------------------
 if ! command -v brl >/dev/null 2>&1; then
     echo "[!] Bedrock Linux not detected."
     if ask "Do you want to install Bedrock Linux?"; then
@@ -47,14 +50,18 @@ if ! command -v brl >/dev/null 2>&1; then
 fi
 echo "[+] Bedrock detected."
 
-# --- Step 2: Configure strata ---
-if ask "Do you want to configure recommended strata (Arch, Debian, Fedora)?"; then
+# -----------------------
+# Step 2: Configure strata
+# -----------------------
+if ask "Do you want to configure recommended strata (Arch, Ubuntu, Fedora)?"; then
     sudo brl fetch arch
-    sudo brl fetch debian
+    sudo brl fetch ubuntu
     sudo brl fetch fedora
 fi
 
-# --- Step 3: Install tools ---
+# -----------------------
+# Step 3: Install common tools
+# -----------------------
 COMMON_PKGS=(zsh tmux curl wget git)
 WAYLAND_PKGS=(foot)
 X11_PKGS=(alacritty)
@@ -76,12 +83,21 @@ fi
 
 install_if_missing yay
 
-# --- Step 4: Apply configs safely ---
-echo "[*] Applying configs..."
-safe_run_config ~/bin/unified-color.sh "color palette"
+# -----------------------
+# Step 4: Apply configs (colors + term launcher)
+# -----------------------
+safe_run_config ~/bin/unified-colors.sh "color palette"
 safe_run_config "~/bin/term.sh --install" "term launcher"
 
-# --- Step 5: Make zsh default ---
+# -----------------------
+# Step 5: SSH setup
+# -----------------------
+echo "[*] Running SSH setup..."
+sudo ~/bin/ssh-setup.sh
+
+# -----------------------
+# Step 6: Set zsh as default shell (optional)
+# -----------------------
 if [[ "$SHELL" != *zsh ]]; then
     if ask "Set zsh as your default shell?"; then
         chsh -s "$(which zsh)"
@@ -89,4 +105,10 @@ if [[ "$SHELL" != *zsh ]]; then
     fi
 fi
 
-echo "[✅] Bootstrap complete. Reboot/log out to apply everything."
+# -----------------------
+# Finish
+# -----------------------
+echo "[✅] Bootstrap complete!"
+echo "    • Restart or log out to apply shell changes."
+echo "    • Use 'term' to launch your terminal + tmux."
+echo "    • SSH configured for 'goldsteal'. Remember to harden root login if enabled."
