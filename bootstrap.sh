@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bootstrap.sh — Modular Bedrock Linux bootstrap with strata, tools, terminal, colors, and SSH
+# bootstrap.sh — Modular Bedrock Linux bootstrap with strata, tools, terminals, colors, WM, and SSH
 set -euo pipefail
 
 ask() {
@@ -53,19 +53,21 @@ echo "[+] Bedrock detected."
 # -----------------------
 # Step 2: Configure strata
 # -----------------------
-if ask "Do you want to configure recommended strata (Arch, Debian, Fedora)?"; then
+if ask "Do you want to configure recommended strata (Arch, Ubuntu, Fedora)?"; then
     sudo brl fetch arch
-    sudo brl fetch debian
+    sudo brl fetch ubuntu
     sudo brl fetch fedora
 fi
 
 # -----------------------
 # Step 3: Install common tools
 # -----------------------
+# -----------------------
+# Step 3a: Install zsh, tmux, curl, wget & git
+# -----------------------
 COMMON_PKGS=(zsh tmux curl wget git)
-WAYLAND_PKGS=(foot)
-X11_PKGS=(alacritty)
-AUR_PKGS=(yay)
+WAYLAND_PKGS=(foot sway)
+X11_PKGS=(alacritty i3)
 
 for pkg in "${COMMON_PKGS[@]}"; do
     install_if_missing "$pkg"
@@ -85,23 +87,11 @@ fi
 # Step 3b: Install yay (optional, Arch-only)
 # -----------------------
 install_yay() {
-    # Check if Arch stratum exists
     if brl which -s pacman >/dev/null 2>&1; then
         echo "[*] Arch stratum detected."
-
-        # Prompt for yay installation
         if ask "Do you want to install yay (AUR helper) in Arch stratum?"; then
-            echo "[*] Installing base-devel and git in Arch stratum..."
             brl sh -c 'sudo pacman -Sy --noconfirm --needed base-devel git'
-
-            echo "[*] Cloning and building yay..."
-            brl sh -c '
-                cd /tmp &&
-                rm -rf yay &&
-                git clone https://aur.archlinux.org/yay.git &&
-                cd yay &&
-                makepkg -si --noconfirm
-            '
+            brl sh -c 'cd /tmp && rm -rf yay && git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si --noconfirm'
             echo "[+] yay installed in Arch stratum."
         else
             echo "[!] Skipped yay installation."
@@ -110,14 +100,62 @@ install_yay() {
         echo "[!] Arch stratum not detected; skipping yay."
     fi
 }
-
 install_yay
 
 # -----------------------
 # Step 4: Apply configs (colors + term launcher)
 # -----------------------
-safe_run_config ~/bin/unified-colors.sh "color palette"
+safe_run_config ~/bin/colors.sh "color palette"
 safe_run_config "~/bin/term.sh --install" "term launcher"
+
+# -----------------------
+# Step 4b: WM & keybindings setup
+# -----------------------
+wm_setup() {
+    SESSION_TYPE=${XDG_SESSION_TYPE:-}
+    echo "[*] Detected session: $SESSION_TYPE"
+
+    if [[ "$SESSION_TYPE" == "wayland" ]]; then
+        echo "[*] Configuring sway..."
+        mkdir -p ~/.config/sway
+        if [[ ! -f ~/.config/sway/config ]]; then
+            cp /etc/sway/config ~/.config/sway/config
+            cat >> ~/.config/sway/config <<'EOF'
+# Vim-like movement
+bindsym h focus left
+bindsym j focus down
+bindsym k focus up
+bindsym l focus right
+
+# Terminal
+bindsym Return exec foot
+EOF
+        fi
+        echo "[+] Sway installed and configured."
+
+    elif [[ "$SESSION_TYPE" == "x11" ]]; then
+        echo "[*] Configuring i3..."
+        mkdir -p ~/.config/i3
+        if [[ ! -f ~/.config/i3/config ]]; then
+            cp /etc/i3/config ~/.config/i3/config
+            cat >> ~/.config/i3/config <<'EOF'
+# Vim-like movement
+bindsym h focus left
+bindsym j focus down
+bindsym k focus up
+bindsym l focus right
+
+# Terminal
+bindsym Return exec alacritty
+EOF
+        fi
+        echo "[+] i3 installed and configured."
+
+    else
+        echo "[!] Could not detect X11 or Wayland session. Start session manually."
+    fi
+}
+safe_run_config ~/bin/wm-setup.sh "Window Manager (i3/sway) + vim-like keybindings"
 
 # -----------------------
 # Step 5: SSH setup
@@ -142,3 +180,4 @@ echo "[✅] Bootstrap complete!"
 echo "    • Restart or log out to apply shell changes."
 echo "    • Use 'term' to launch your terminal + tmux."
 echo "    • SSH configured for 'goldsteal'. Remember to harden root login if enabled."
+echo "    • WM installed with vim-like keybindings; terminal auto-launch configured."
