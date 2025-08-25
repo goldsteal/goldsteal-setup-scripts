@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# bootstrap.sh — Modular Bedrock Linux bootstrap with strata, tools, terminals, colors, WM, and SSH
+# bootstrap.sh — Full modular Bedrock Linux bootstrap
 set -euo pipefail
+
+TARGET_USER=${TARGET_USER:-goldsteal}
+USER_HOME=$(eval echo "~$TARGET_USER")
 
 ask() {
     read -rp "$1 [y/N] " response
@@ -11,9 +14,7 @@ install_if_missing() {
     local pkg=$1
     if ! command -v "$pkg" >/dev/null 2>&1; then
         echo "[*] Installing $pkg..."
-        brl fetch "$pkg" || sudo pacman -S --noconfirm "$pkg" || sudo apt install -y "$pkg"
-    else
-        echo "[+] $pkg already installed."
+        sudo brl fetch "$pkg" || sudo pacman -S --noconfirm "$pkg" || sudo apt install -y "$pkg"
     fi
 }
 
@@ -28,7 +29,7 @@ safe_run_config() {
             echo "[!] Skipped $desc config."
         fi
     else
-        echo "[!] Missing $script (expected for $desc)."
+        echo "[!] Warning: Missing $script (expected for $desc). Continuing..."
     fi
 }
 
@@ -53,17 +54,14 @@ echo "[+] Bedrock detected."
 # -----------------------
 # Step 2: Configure strata
 # -----------------------
-if ask "Do you want to configure recommended strata (Arch, Ubuntu, Fedora)?"; then
+if ask "Do you want to configure recommended strata (Arch, Debian, Fedora)?"; then
     sudo brl fetch arch
-    sudo brl fetch ubuntu
+    sudo brl fetch debian
     sudo brl fetch fedora
 fi
 
 # -----------------------
 # Step 3: Install common tools
-# -----------------------
-# -----------------------
-# Step 3a: Install zsh, tmux, curl, wget & git
 # -----------------------
 COMMON_PKGS=(zsh tmux curl wget git)
 WAYLAND_PKGS=(foot sway)
@@ -73,7 +71,8 @@ for pkg in "${COMMON_PKGS[@]}"; do
     install_if_missing "$pkg"
 done
 
-if [[ "${XDG_SESSION_TYPE:-}" == "wayland" ]]; then
+SESSION_TYPE=${XDG_SESSION_TYPE:-}
+if [[ "$SESSION_TYPE" == "wayland" ]]; then
     for pkg in "${WAYLAND_PKGS[@]}"; do
         install_if_missing "$pkg"
     done
@@ -90,8 +89,8 @@ install_yay() {
     if brl which -s pacman >/dev/null 2>&1; then
         echo "[*] Arch stratum detected."
         if ask "Do you want to install yay (AUR helper) in Arch stratum?"; then
-            brl sh -c 'sudo pacman -Sy --noconfirm --needed base-devel git'
-            brl sh -c 'cd /tmp && rm -rf yay && git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si --noconfirm'
+            sudo brl sh -c 'pacman -Sy --noconfirm --needed base-devel git'
+            sudo brl sh -c 'cd /tmp && rm -rf yay && git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si --noconfirm'
             echo "[+] yay installed in Arch stratum."
         else
             echo "[!] Skipped yay installation."
@@ -103,72 +102,28 @@ install_yay() {
 install_yay
 
 # -----------------------
-# Step 4: Apply configs (colors + term launcher)
+# Step 4: Apply configs (colors + terminal launcher)
 # -----------------------
-safe_run_config ~/bin/colors.sh "color palette"
-safe_run_config "~/bin/term.sh --install" "term launcher"
+safe_run_config "$USER_HOME/bin/colors.sh" "color palette"
+safe_run_config "$USER_HOME/bin/term.sh --install" "term launcher"
 
 # -----------------------
 # Step 4b: WM & keybindings setup
 # -----------------------
-wm_setup() {
-    SESSION_TYPE=${XDG_SESSION_TYPE:-}
-    echo "[*] Detected session: $SESSION_TYPE"
-
-    if [[ "$SESSION_TYPE" == "wayland" ]]; then
-        echo "[*] Configuring sway..."
-        mkdir -p ~/.config/sway
-        if [[ ! -f ~/.config/sway/config ]]; then
-            cp /etc/sway/config ~/.config/sway/config
-            cat >> ~/.config/sway/config <<'EOF'
-# Vim-like movement
-bindsym h focus left
-bindsym j focus down
-bindsym k focus up
-bindsym l focus right
-
-# Terminal
-bindsym Return exec foot
-EOF
-        fi
-        echo "[+] Sway installed and configured."
-
-    elif [[ "$SESSION_TYPE" == "x11" ]]; then
-        echo "[*] Configuring i3..."
-        mkdir -p ~/.config/i3
-        if [[ ! -f ~/.config/i3/config ]]; then
-            cp /etc/i3/config ~/.config/i3/config
-            cat >> ~/.config/i3/config <<'EOF'
-# Vim-like movement
-bindsym h focus left
-bindsym j focus down
-bindsym k focus up
-bindsym l focus right
-
-# Terminal
-bindsym Return exec alacritty
-EOF
-        fi
-        echo "[+] i3 installed and configured."
-
-    else
-        echo "[!] Could not detect X11 or Wayland session. Start session manually."
-    fi
-}
-safe_run_config ~/bin/wm-setup.sh "Window Manager (i3/sway) + vim-like keybindings"
+safe_run_config "$USER_HOME/bin/wm-setup.sh" "Window Manager (i3/sway) + vim-like keybindings"
 
 # -----------------------
 # Step 5: SSH setup
 # -----------------------
 echo "[*] Running SSH setup..."
-sudo ~/bin/ssh-setup.sh
+sudo "$USER_HOME/bin/ssh-setup.sh"
 
 # -----------------------
 # Step 6: Set zsh as default shell (optional)
 # -----------------------
 if [[ "$SHELL" != *zsh ]]; then
     if ask "Set zsh as your default shell?"; then
-        chsh -s "$(which zsh)"
+        chsh -s "$(which zsh)" "$TARGET_USER"
         echo "[+] Default shell set to zsh. Relog required."
     fi
 fi
@@ -179,5 +134,5 @@ fi
 echo "[✅] Bootstrap complete!"
 echo "    • Restart or log out to apply shell changes."
 echo "    • Use 'term' to launch your terminal + tmux."
-echo "    • SSH configured for 'goldsteal'. Remember to harden root login if enabled."
+echo "    • SSH configured for '$TARGET_USER'."
 echo "    • WM installed with vim-like keybindings; terminal auto-launch configured."
