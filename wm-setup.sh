@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# wm-setup.sh — Configure i3 (X11) or sway (Wayland) with vim-like keybindings and auto-terminal.
+# wm-setup.sh — Configure i3 (X11) or sway (Wayland) with vim-like keybindings and auto-terminal
 set -euo pipefail
+
+TARGET_USER=${TARGET_USER:-goldsteal}
+USER_HOME=$(eval echo "~$TARGET_USER")
+WM_CONFIG_DIR="$USER_HOME/.config"
+SESSION_TYPE=${XDG_SESSION_TYPE:-}
 
 ask() {
     read -rp "$1 [y/N] " response
@@ -11,18 +16,15 @@ install_if_missing() {
     local pkg=$1
     if ! command -v "$pkg" >/dev/null 2>&1; then
         echo "[*] Installing $pkg..."
-        brl fetch "$pkg" || sudo pacman -S --noconfirm "$pkg" || sudo apt install -y "$pkg"
-    else
-        echo "[+] $pkg already installed."
+        sudo brl fetch "$pkg" || sudo pacman -S --noconfirm "$pkg" || sudo apt install -y "$pkg"
     fi
 }
 
-SESSION_TYPE=${XDG_SESSION_TYPE:-}
-WM_CONFIG_DIR="$HOME/.config"
+echo "[*] Detected session: $SESSION_TYPE"
+
+# Paths for override configs
 WM_OVERRIDE_I3="$WM_CONFIG_DIR/i3/config.override"
 WM_OVERRIDE_SWAY="$WM_CONFIG_DIR/sway/config.override"
-
-echo "[*] Detected session: $SESSION_TYPE"
 
 if [[ "$SESSION_TYPE" == "wayland" ]]; then
     echo "[*] Installing sway + foot..."
@@ -77,5 +79,5 @@ EOF
     fi
 
 else
-    echo "[!] Could not detect X11 or Wayland session. Please start your session manually."
+    echo "[!] Could not detect X11 or Wayland session. Start session manually."
 fi
