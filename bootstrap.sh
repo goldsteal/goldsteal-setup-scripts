@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# bootstrap.sh — Full modular Bedrock Linux bootstrap
+# bootstrap.sh — single-folder bootstrap
 set -euo pipefail
+
+# Detect repo folder
+REPO_DIR=$(dirname "$(realpath "$0")")
+export PATH="$REPO_DIR:$PATH"
 
 TARGET_USER=${TARGET_USER:-goldsteal}
 USER_HOME=$(eval echo "~$TARGET_USER")
@@ -21,7 +25,6 @@ install_if_missing() {
 safe_run_config() {
     local script=$1
     local desc=$2
-
     if [[ -f "$script" ]]; then
         if ask "Run $desc configuration from $script?"; then
             "$script"
@@ -52,16 +55,16 @@ fi
 echo "[+] Bedrock detected."
 
 # -----------------------
-# Step 2: Configure strata
+# Step 2: Optional strata
 # -----------------------
-if ask "Do you want to configure recommended strata (Arch, Debian, Fedora)?"; then
+if ask "Configure recommended strata (Arch, Debian, Fedora)?"; then
     sudo brl fetch arch
     sudo brl fetch debian
     sudo brl fetch fedora
 fi
 
 # -----------------------
-# Step 3: Install common tools
+# Step 3: Common tools
 # -----------------------
 COMMON_PKGS=(zsh tmux curl wget git)
 WAYLAND_PKGS=(foot sway)
@@ -83,56 +86,35 @@ else
 fi
 
 # -----------------------
-# Step 3b: Install yay (optional, Arch-only)
+# Step 3b: yay (Arch only)
 # -----------------------
-install_yay() {
-    if brl which -s pacman >/dev/null 2>&1; then
-        echo "[*] Arch stratum detected."
-        if ask "Do you want to install yay (AUR helper) in Arch stratum?"; then
-            sudo brl sh -c 'pacman -Sy --noconfirm --needed base-devel git'
-            sudo brl sh -c 'cd /tmp && rm -rf yay && git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si --noconfirm'
-            echo "[+] yay installed in Arch stratum."
-        else
-            echo "[!] Skipped yay installation."
-        fi
-    else
-        echo "[!] Arch stratum not detected; skipping yay."
+if brl which -s pacman >/dev/null 2>&1; then
+    if ask "Install yay in Arch stratum?"; then
+        sudo brl sh -c 'pacman -Sy --noconfirm --needed base-devel git'
+        sudo brl sh -c 'cd /tmp && rm -rf yay && git clone https://aur.archlinux.org/yay.git && cd yay && makepkg -si --noconfirm'
     fi
-}
-install_yay
+fi
 
 # -----------------------
-# Step 4: Apply configs (colors + terminal launcher)
+# Step 4: Configs
 # -----------------------
-safe_run_config "$USER_HOME/bin/colors.sh" "color palette"
-safe_run_config "$USER_HOME/bin/term.sh --install" "term launcher"
+safe_run_config "$REPO_DIR/colors.sh" "color palette"
+safe_run_config "$REPO_DIR/term.sh --install" "term launcher"
+safe_run_config "$REPO_DIR/wm-setup.sh" "Window Manager (i3/sway) + vim-like keybindings"
 
 # -----------------------
-# Step 4b: WM & keybindings setup
+# Step 5: SSH
 # -----------------------
-safe_run_config "$USER_HOME/bin/wm-setup.sh" "Window Manager (i3/sway) + vim-like keybindings"
+sudo "$REPO_DIR/ssh-setup.sh"
 
 # -----------------------
-# Step 5: SSH setup
-# -----------------------
-echo "[*] Running SSH setup..."
-sudo "$USER_HOME/bin/ssh-setup.sh"
-
-# -----------------------
-# Step 6: Set zsh as default shell (optional)
+# Step 6: Set zsh default shell
 # -----------------------
 if [[ "$SHELL" != *zsh ]]; then
-    if ask "Set zsh as your default shell?"; then
+    if ask "Set zsh as default shell?"; then
         chsh -s "$(which zsh)" "$TARGET_USER"
         echo "[+] Default shell set to zsh. Relog required."
     fi
 fi
 
-# -----------------------
-# Finish
-# -----------------------
-echo "[✅] Bootstrap complete!"
-echo "    • Restart or log out to apply shell changes."
-echo "    • Use 'term' to launch your terminal + tmux."
-echo "    • SSH configured for '$TARGET_USER'."
-echo "    • WM installed with vim-like keybindings; terminal auto-launch configured."
+echo "[✅] Bootstrap complete! Use 'term' to launch your terminal + tmux."
