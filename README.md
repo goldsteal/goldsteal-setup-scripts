@@ -20,7 +20,8 @@ All scripts stay inside this repo folder → no $HOME/bin, no /usr/local/bin, no
 
 On a fresh install:
 # 1. Clone repo
-git clone https://github.com/<your-username>/bootstrap-scripts.git
+git clone https://github.com/goldsteal/bootstrap-scripts.git 
+#git clone https://github.com/YOURUSERNAME/bootstrap-scripts.git 
 cd bootstrap-scripts
 
 # 2. Make scripts executable
